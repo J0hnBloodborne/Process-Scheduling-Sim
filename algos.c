@@ -1,0 +1,109 @@
+#include "algos.h"
+#include "heap.h"
+#include <stdbool.h>
+
+void fcfs(Process *p, int n) {
+    quicksort(p, 0, n - 1, cmp_arrival);
+    int current_time = 0;
+    for (int i = 0; i < n; i++) {
+        if (current_time < p[i].arrival) current_time = p[i].arrival;
+        current_time += p[i].burst;
+        p[i].completion = current_time;
+        p[i].turnaround = p[i].completion - p[i].arrival;
+        p[i].waiting = p[i].turnaround - p[i].burst;
+    }
+}
+
+void sjf(Process *p, int n) {
+    int current_time = 0, done = 0;
+    int *heap = malloc(n * sizeof(int));
+    int heap_size = 0;
+    bool *added = calloc(n, sizeof(bool));
+
+    int earliest = INT_MAX;
+    for (int i = 0; i < n; i++) if (p[i].arrival < earliest) earliest = p[i].arrival;
+    current_time = earliest;
+    for (int i = 0; i < n; i++) if (p[i].arrival == earliest) { 
+        pushHeap(p, heap, &heap_size, i); 
+        added[i] = true; 
+    }
+
+    while (done < n) {
+        if (heap_size == 0) {
+            int next_arrival = INT_MAX;
+            for (int i = 0; i < n; i++)
+                if (!added[i] && p[i].arrival < next_arrival)
+                    next_arrival = p[i].arrival;
+            current_time = next_arrival;
+            for (int i = 0; i < n; i++)
+                if (!added[i] && p[i].arrival == current_time) {
+                    pushHeap(p, heap, &heap_size, i);
+                    added[i] = true;
+                }
+            continue;
+        }
+
+        int idx = popHeap(p, heap, &heap_size);
+        p[idx].completion = current_time + p[idx].burst;
+        p[idx].turnaround = p[idx].completion - p[idx].arrival;
+        p[idx].waiting = current_time - p[idx].arrival;
+        p[idx].remaining = 0;
+        current_time = p[idx].completion;
+        done++;
+
+        for (int i = 0; i < n; i++)
+            if (!added[i] && p[i].arrival <= current_time) {
+                pushHeap(p, heap, &heap_size, i);
+                added[i] = true;
+            }
+    }
+    free(heap);
+    free(added);
+}
+
+void rr(Process *p, int n, int q){
+    int current_time = 0, done = 0;
+    int *queue = malloc(n * n * sizeof(int));
+    int front = 0, rear = 0;
+    bool *in_queue = calloc(n, sizeof(bool));
+
+    if (rear == 0) {
+        int earliest = INT_MAX;
+        for (int i = 0; i < n; i++) if (p[i].arrival < earliest) earliest = p[i].arrival;
+        current_time = earliest;
+        for (int i = 0; i < n; i++) {
+            if (p[i].arrival == earliest) {
+                queue[rear++] = i;
+                in_queue[i] = true;
+            }
+        }
+    }
+
+    while (front < rear) {
+        int i = queue[front++];
+        if (p[i].remaining > 0 && p[i].arrival <= current_time) {
+            int slice = (p[i].remaining > q) ? q : p[i].remaining;
+            p[i].remaining -= slice;
+            current_time += slice;
+            for (int j = 0; j < n; j++) {
+                if (!in_queue[j] && p[j].arrival <= current_time) {
+                    queue[rear++] = j;
+                    in_queue[j] = true;
+                }
+            }
+            if (p[i].remaining == 0) {
+                p[i].completion = current_time;
+                p[i].turnaround = p[i].completion - p[i].arrival;
+                p[i].waiting = p[i].turnaround - p[i].burst;
+                done++;
+            } else {
+                queue[rear++] = i;
+            }
+        } else if (p[i].remaining > 0) {
+            current_time = p[i].arrival;
+            queue[rear++] = i;
+        }
+    }
+    free(queue);
+    free(in_queue);
+}
