@@ -1,11 +1,22 @@
 #include "gui.h"
+#include "pclass.h"
+#include "reader.h"
+#include "algos.h"
+
+#include <windows.h>
+#include <commdlg.h>
+#include <stdio.h>
+#include <stdlib.h>
+
 
 #define ID_BTN_OPEN 1
 #define ID_BTN_START 2
 #define ID_BTN_EXIT 3
+#define ID_STATIC_PATH 1002
 
 static char selectedFile[MAX_PATH] = {0};
 static int quantumInput = 0;
+static HWND hStaticPath = NULL;
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
@@ -29,6 +40,9 @@ void ShowMainWindow(HINSTANCE hInstance) {
     CreateWindow("BUTTON", "Exit", WS_VISIBLE | WS_CHILD,
         280, 30, 80, 30, hwnd, (HMENU)ID_BTN_EXIT, hInstance, NULL);
 
+    hStaticPath = CreateWindow("STATIC", "No file selected.", WS_VISIBLE | WS_CHILD | SS_LEFT,
+        20, 70, 340, 20, hwnd, (HMENU)ID_STATIC_PATH, hInstance, NULL);
+
     ShowWindow(hwnd, SW_SHOWDEFAULT);
     UpdateWindow(hwnd);
 
@@ -46,11 +60,15 @@ void OpenInputFileDialog(HWND hwnd) {
     ofn.hwndOwner = hwnd;
     ofn.lpstrFile = fileName;
     ofn.nMaxFile = MAX_PATH;
-    ofn.lpstrFilter = "All Files\0*.*\0";
+    ofn.lpstrFilter = "CSV Files\0*.csv\0All Files\0*.*\0";
     ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
+    ofn.lpstrTitle = "Select an input CSV file";
     if (GetOpenFileName(&ofn)) {
         strcpy(selectedFile, fileName);
         MessageBox(hwnd, selectedFile, "Selected File", MB_OK);
+        if (hStaticPath) {
+            SetWindowText(hStaticPath, selectedFile);
+        }
     }
 }
 
@@ -76,11 +94,61 @@ INT_PTR CALLBACK QuantumDlgProc(HWND dHwnd, UINT msg, WPARAM w, LPARAM l) {
 void AskQuantumDialog(HWND hwnd) {
     quantumInputBuffer[0] = '\0';
     if (DialogBoxParam(NULL, MAKEINTRESOURCE(101), hwnd, QuantumDlgProc, 0) == IDOK) {
-        // quantumInput is now set
         char buf[32];
         sprintf(buf, "Quantum: %d", quantumInput);
         MessageBox(hwnd, buf, "Quantum Set", MB_OK);
     }
+}
+
+void RunScheduling(HWND hwnd) {
+    if (selectedFile[0] == '\0') {
+        MessageBox(hwnd, "No input file selected!", "Error", MB_ICONERROR);
+        return;
+    }
+    if (quantumInput <= 0) {
+        MessageBox(hwnd, "Quantum must be set and > 0!", "Error", MB_ICONERROR);
+        return;
+    }
+
+    int n = countLines(selectedFile);
+    Process* processes = malloc(n * sizeof(Process));
+    int loaded = loadCSV(selectedFile, processes);
+
+    if (loaded <= 0) {
+        MessageBox(hwnd, "Failed to load processes!", "Error", MB_ICONERROR);
+        free(processes);
+        return;
+    }
+
+    Process* proc_fcfs = malloc(loaded * sizeof(Process));
+    Process* proc_sjf  = malloc(loaded * sizeof(Process));
+    Process* proc_rr   = malloc(loaded * sizeof(Process));
+    for (int i = 0; i < loaded; i++) {
+        proc_fcfs[i] = processes[i];
+        proc_sjf[i]  = processes[i];
+        proc_rr[i]   = processes[i];
+        proc_rr[i].remaining = processes[i].burst;
+    }
+
+    SchedResult res_fcfs = fcfs(proc_fcfs, loaded);
+    SchedResult res_sjf  = sjf(proc_sjf, loaded);
+    SchedResult res_rr   = rr(proc_rr, loaded, quantumInput);
+
+    printf("Loaded %d processes from the file.\n", loaded);
+    for (int i = 0; i < loaded; i++) {
+        printf("Process ID: %d, Burst Time: %d, Arrival Time: %d\n", processes[i].pid, processes[i].burst, processes[i].arrival);
+    }
+    printf("\nResults:\n");
+    printf("FCFS: Avg Waiting = %.2f, Avg Turnaround = %.2f\n", res_fcfs.avg_waiting, res_fcfs.avg_turnaround);
+    printf("SJF:  Avg Waiting = %.2f, Avg Turnaround = %.2f\n", res_sjf.avg_waiting, res_sjf.avg_turnaround);
+    printf("RR:   Avg Waiting = %.2f, Avg Turnaround = %.2f (Quantum: %d)\n", res_rr.avg_waiting, res_rr.avg_turnaround, quantumInput);
+
+    free(processes);
+    free(proc_fcfs);
+    free(proc_sjf);
+    free(proc_rr);
+
+    MessageBox(hwnd, "Scheduling test results printed to terminal.", "Done", MB_OK);
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -92,7 +160,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                     break;
                 case ID_BTN_START:
                     AskQuantumDialog(hwnd);
-                    // TODO: call your scheduling/graph code here
+                    RunScheduling(hwnd);
                     break;
                 case ID_BTN_EXIT:
                     PostQuitMessage(0);
