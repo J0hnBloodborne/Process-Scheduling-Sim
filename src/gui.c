@@ -1,13 +1,4 @@
 #include "gui.h"
-#include "pclass.h"
-#include "reader.h"
-#include "algos.h"
-
-#include <windows.h>
-#include <commdlg.h>
-#include <stdio.h>
-#include <stdlib.h>
-
 
 #define ID_BTN_OPEN 1
 #define ID_BTN_START 2
@@ -113,6 +104,10 @@ void RunScheduling(HWND hwnd) {
     int n = countLines(selectedFile);
     Process* processes = malloc(n * sizeof(Process));
     int loaded = loadCSV(selectedFile, processes);
+    printf("Loaded %d processes from the file.\n", loaded);
+    for (int i = 0; i < loaded; i++) {
+        printf("Process ID: %d, Burst Time: %d, Arrival Time: %d\n", processes[i].pid, processes[i].burst, processes[i].arrival);
+    }
 
     if (loaded <= 0) {
         MessageBox(hwnd, "Failed to load processes!", "Error", MB_ICONERROR);
@@ -134,21 +129,20 @@ void RunScheduling(HWND hwnd) {
     SchedResult res_sjf  = sjf(proc_sjf, loaded);
     SchedResult res_rr   = rr(proc_rr, loaded, quantumInput);
 
-    printf("Loaded %d processes from the file.\n", loaded);
-    for (int i = 0; i < loaded; i++) {
-        printf("Process ID: %d, Burst Time: %d, Arrival Time: %d\n", processes[i].pid, processes[i].burst, processes[i].arrival);
-    }
-    printf("\nResults:\n");
-    printf("FCFS: Avg Waiting = %.2f, Avg Turnaround = %.2f\n", res_fcfs.avg_waiting, res_fcfs.avg_turnaround);
-    printf("SJF:  Avg Waiting = %.2f, Avg Turnaround = %.2f\n", res_sjf.avg_waiting, res_sjf.avg_turnaround);
-    printf("RR:   Avg Waiting = %.2f, Avg Turnaround = %.2f (Quantum: %d)\n", res_rr.avg_waiting, res_rr.avg_turnaround, quantumInput);
+    ShowGraphWindow(loaded, res_fcfs.avg_waiting, res_sjf.avg_waiting, res_rr.avg_waiting,
+                res_fcfs.avg_turnaround, res_sjf.avg_turnaround, res_rr.avg_turnaround);
+
+    // printf("\nResults:\n");
+    // printf("FCFS: Avg Waiting = %.2f, Avg Turnaround = %.2f\n", res_fcfs.avg_waiting, res_fcfs.avg_turnaround);
+    // printf("SJF:  Avg Waiting = %.2f, Avg Turnaround = %.2f\n", res_sjf.avg_waiting, res_sjf.avg_turnaround);
+    // printf("RR:   Avg Waiting = %.2f, Avg Turnaround = %.2f (Quantum: %d)\n", res_rr.avg_waiting, res_rr.avg_turnaround, quantumInput);
 
     free(processes);
     free(proc_fcfs);
     free(proc_sjf);
     free(proc_rr);
 
-    MessageBox(hwnd, "Scheduling test results printed to terminal.", "Done", MB_OK);
+    // MessageBox(hwnd, "Scheduling test results printed to terminal.", "Done", MB_OK);
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {

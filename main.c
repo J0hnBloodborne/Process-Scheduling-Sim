@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-int main() {
-    ShowMainWindow(GetModuleHandle(NULL));
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
+    ShowMainWindow(hInstance);
     return 0;
 }

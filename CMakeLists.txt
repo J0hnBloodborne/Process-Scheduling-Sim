@@ -4,24 +4,28 @@ project(ProcessSchedulingSim C)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_BUILD_TYPE Release)
 
-# Put all source files in src/
 file(GLOB SRC_FILES "src/*.c")
 include_directories(${CMAKE_SOURCE_DIR}/src)
 
-add_executable(ProcessSchedulingSim main.c ${SRC_FILES} src/quantum.rc)
+# Resource file (if you want it)
+set(RC_FILE src/quantum.rc)
 
-# Windows resource file handling
-if(MSVC)
-    set_source_files_properties(src/quantum.rc PROPERTIES LANGUAGE RC)
-else()
-    # MinGW/GCC needs windres
-    set(CMAKE_RC_COMPILER_INIT windres)
-    enable_language(RC)
-    set_source_files_properties(src/quantum.rc PROPERTIES OBJECT_DEPENDENCIES src/quantum.rc)
+# Build as GUI app, no console pop-up
+add_executable(ProcessSchedulingSim WIN32 main.c ${SRC_FILES} ${RC_FILE})
+
+# Link Windows GUI libraries
+target_link_libraries(ProcessSchedulingSim PRIVATE comdlg32 gdi32)
+
+# Try to statically link everything (works with MinGW-w64, not MSVC)
+if(MINGW)
+    set_target_properties(ProcessSchedulingSim PROPERTIES
+        LINK_FLAGS "-static -static-libgcc -static-libstdc++ -mwindows"
+    )
 endif()
 
-# Link Windows GUI library
-#target_link_libraries(ProcessSchedulingSim PRIVATE comdlg32)
-
-# If you want OpenGL, add:
-# target_link_libraries(ProcessSchedulingSim PRIVATE opengl32)
+# Output exe to release/
+foreach(OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES})
+    string(TOUPPER ${OUTPUTCONFIG} OUTPUTCONFIG_UPPER)
+    set_target_properties(ProcessSchedulingSim PROPERTIES
+      RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG_UPPER} "${CMAKE_SOURCE_DIR}/release")
+endforeach()
