@@ -1,21 +1,30 @@
 #include "algos.h"
 #include "heap.h"
+#include "pclass.h"
 #include <stdbool.h>
+#include <stdlib.h>
 
-void fcfs(Process *p, int n) {
-    quicksort(p, 0, n - 1, cmp_arrival);
+SchedResult fcfs(Process *p, int n) {
+    quicksort(p, 0, n - 1);
     int current_time = 0;
+    int total_waiting = 0, total_turnaround = 0;
     for (int i = 0; i < n; i++) {
         if (current_time < p[i].arrival) current_time = p[i].arrival;
         current_time += p[i].burst;
         p[i].completion = current_time;
         p[i].turnaround = p[i].completion - p[i].arrival;
         p[i].waiting = p[i].turnaround - p[i].burst;
+        total_waiting += p[i].waiting;
+        total_turnaround += p[i].turnaround;
     }
+    SchedResult r = { total_waiting / (double)n, total_turnaround / (double)n };
+    return r;
 }
 
-void sjf(Process *p, int n) {
+SchedResult sjf(Process *p, int n) {
     int current_time = 0, done = 0;
+    int total_waiting = 0, total_turnaround = 0;
+
     int *heap = malloc(n * sizeof(int));
     int heap_size = 0;
     bool *added = calloc(n, sizeof(bool));
@@ -51,6 +60,9 @@ void sjf(Process *p, int n) {
         current_time = p[idx].completion;
         done++;
 
+        total_waiting += p[idx].waiting;
+        total_turnaround += p[idx].turnaround;
+
         for (int i = 0; i < n; i++)
             if (!added[i] && p[i].arrival <= current_time) {
                 pushHeap(p, heap, &heap_size, i);
@@ -59,10 +71,15 @@ void sjf(Process *p, int n) {
     }
     free(heap);
     free(added);
+
+    SchedResult r = { total_waiting / (double)n, total_turnaround / (double)n };
+    return r;
 }
 
-void rr(Process *p, int n, int q){
+SchedResult rr(Process *p, int n, int q) {
     int current_time = 0, done = 0;
+    int total_waiting = 0, total_turnaround = 0;
+
     int *queue = malloc(n * n * sizeof(int));
     int front = 0, rear = 0;
     bool *in_queue = calloc(n, sizeof(bool));
@@ -95,6 +112,8 @@ void rr(Process *p, int n, int q){
                 p[i].completion = current_time;
                 p[i].turnaround = p[i].completion - p[i].arrival;
                 p[i].waiting = p[i].turnaround - p[i].burst;
+                total_waiting += p[i].waiting;
+                total_turnaround += p[i].turnaround;
                 done++;
             } else {
                 queue[rear++] = i;
@@ -106,4 +125,7 @@ void rr(Process *p, int n, int q){
     }
     free(queue);
     free(in_queue);
+
+    SchedResult r = { total_waiting / (double)n, total_turnaround / (double)n };
+    return r;
 }

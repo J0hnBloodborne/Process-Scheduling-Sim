@@ -1,6 +1,6 @@
 #include "sort.h"
 
-void swap(Process *a, Process *b) {
+void swapProcess(Process *a, Process *b) {
     Process temp = *a;
     *a = *b;
     *b = temp;
@@ -12,10 +12,10 @@ int partition(Process arr[], int low, int high) {
     for (int j = low; j < high; j++) {
         if (arr[j].arrival - pivot->arrival < 0) {
             i++;
-            swap(&arr[i], &arr[j]);
+            swapProcess(&arr[i], &arr[j]);
         }
     }
-    swap(&arr[i + 1], &arr[high]);
+    swapProcess(&arr[i + 1], &arr[high]);
     return i + 1;
 }
 

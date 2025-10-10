@@ -2,6 +2,6 @@
 #include "pclass.h"
 
 void swap(int *a, int *b);
-void heapify(Process *p, int *heap, int size, int i);
-void push_heap(Process *p, int *heap, int *size, int idx);
-int pop_heap(Process *p, int *heap, int *size);
+void reheap(Process *p, int *heap, int size, int i);
+void pushHeap(Process *p, int *heap, int *size, int idx);
+int popHeap(Process *p, int *heap, int *size);
