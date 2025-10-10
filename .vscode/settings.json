@@ -5,5 +5,6 @@
         "pclass.h": "c"
     },
     "python-envs.defaultEnvManager": "ms-python.python:system",
-    "python-envs.pythonProjects": []
+    "python-envs.pythonProjects": [],
+    "cmake.sourceDirectory": "F:/Documents/CS311 Assignment 1"
 }
