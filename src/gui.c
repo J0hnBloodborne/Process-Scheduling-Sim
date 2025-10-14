@@ -184,20 +184,64 @@ void RunScheduling(HWND hwnd) {
     for (int i=0;i<loaded;i++) rr_copy[i] = processes[i], rr_copy[i].remaining = rr_copy[i].burst;
     rr_with_trace(rr_copy, loaded, quantumInput, &rr_slices, &rr_count);
 
-    Slice *fcfs_slices = malloc(sizeof(Slice) * loaded);
-    Slice *sjf_slices  = malloc(sizeof(Slice) * loaded);
-    for (int i=0;i<loaded;i++) {
+    // Build FCFS and SJF slices with idle periods
+    int fcfs_cap = loaded * 2, sjf_cap = loaded * 2;
+    Slice *fcfs_slices = malloc(sizeof(Slice) * fcfs_cap);
+    Slice *sjf_slices  = malloc(sizeof(Slice) * sjf_cap);
+    int fcfs_count = 0, sjf_count = 0;
+    // Sort FCFS processes by start time for correct timeline ordering
+    int *fcfs_idx = malloc(sizeof(int)*loaded);
+    for (int i=0;i<loaded;i++) fcfs_idx[i] = i;
+    for (int a=0;a<loaded-1;a++)
+        for (int b=0;b<loaded-1-a;b++) {
+            int si = proc_fcfs[fcfs_idx[b]].completion - proc_fcfs[fcfs_idx[b]].burst;
+            int sj = proc_fcfs[fcfs_idx[b+1]].completion - proc_fcfs[fcfs_idx[b+1]].burst;
+            if (si > sj) { int t = fcfs_idx[b]; fcfs_idx[b] = fcfs_idx[b+1]; fcfs_idx[b+1] = t; }
+        }
+    int last_end_fcfs = proc_fcfs[fcfs_idx[0]].arrival;
+    for (int k=0;k<loaded;k++) {
+        int i = fcfs_idx[k];
         int start_fcfs = proc_fcfs[i].completion - proc_fcfs[i].burst;
-        fcfs_slices[i].pid = proc_fcfs[i].pid;
-        fcfs_slices[i].start = start_fcfs;
-        fcfs_slices[i].end = proc_fcfs[i].completion;
-
-        int start_sjf = proc_sjf[i].completion - proc_sjf[i].burst;
-        sjf_slices[i].pid = proc_sjf[i].pid;
-        sjf_slices[i].start = start_sjf;
-        sjf_slices[i].end = proc_sjf[i].completion;
+        if (start_fcfs > last_end_fcfs) {
+            fcfs_slices[fcfs_count].pid = -1;
+            fcfs_slices[fcfs_count].start = last_end_fcfs;
+            fcfs_slices[fcfs_count].end = start_fcfs;
+            fcfs_count++;
+        }
+        fcfs_slices[fcfs_count].pid = proc_fcfs[i].pid;
+        fcfs_slices[fcfs_count].start = start_fcfs;
+        fcfs_slices[fcfs_count].end = proc_fcfs[i].completion;
+        fcfs_count++;
+        last_end_fcfs = proc_fcfs[i].completion;
     }
-    ShowGanttWindow("Gantt Chart", fcfs_slices, loaded, sjf_slices, loaded, rr_slices, rr_count, makespan);
+    free(fcfs_idx);
+    // Sort SJF processes by start time for correct timeline ordering
+    int *sjf_idx = malloc(sizeof(int)*loaded);
+    for (int i=0;i<loaded;i++) sjf_idx[i] = i;
+    for (int a=0;a<loaded-1;a++)
+        for (int b=0;b<loaded-1-a;b++) {
+            int si = proc_sjf[sjf_idx[b]].completion - proc_sjf[sjf_idx[b]].burst;
+            int sj = proc_sjf[sjf_idx[b+1]].completion - proc_sjf[sjf_idx[b+1]].burst;
+            if (si > sj) { int t = sjf_idx[b]; sjf_idx[b] = sjf_idx[b+1]; sjf_idx[b+1] = t; }
+        }
+    int last_end_sjf = proc_sjf[sjf_idx[0]].arrival;
+    for (int k=0;k<loaded;k++) {
+        int i = sjf_idx[k];
+        int start_sjf = proc_sjf[i].completion - proc_sjf[i].burst;
+        if (start_sjf > last_end_sjf) {
+            sjf_slices[sjf_count].pid = -1;
+            sjf_slices[sjf_count].start = last_end_sjf;
+            sjf_slices[sjf_count].end = start_sjf;
+            sjf_count++;
+        }
+        sjf_slices[sjf_count].pid = proc_sjf[i].pid;
+        sjf_slices[sjf_count].start = start_sjf;
+        sjf_slices[sjf_count].end = proc_sjf[i].completion;
+        sjf_count++;
+        last_end_sjf = proc_sjf[i].completion;
+    }
+    free(sjf_idx);
+    ShowGanttWindow("Gantt Chart", fcfs_slices, fcfs_count, sjf_slices, sjf_count, rr_slices, rr_count, makespan);
 
     // printf("\nResults:\n");
     // printf("FCFS: Avg Waiting = %.2f, Avg Turnaround = %.2f\n", res_fcfs.avg_waiting, res_fcfs.avg_turnaround);

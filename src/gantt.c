@@ -10,9 +10,9 @@ static COLORREF colorForPid(int pid) {
 
 static void DrawTimeline(HDC hdc, RECT client, const char* label, const Slice* s, int n, int makespan, int row, int virtualWidth, int scrollX) {
     int left = 80;
-    int top = 50 + row * 120; // increased spacing between rows
-    int height = 60;          // slightly taller lanes
-    int width = virtualWidth - left - 20; // virtual timeline width
+    int top = 50 + row * 120;
+    int height = 60;
+    int width = virtualWidth - left - 20;
 
     SetBkMode(hdc, TRANSPARENT);
     TextOutA(hdc, 10, top + (height/2 - 8), label, (int)lstrlenA(label));
@@ -22,42 +22,70 @@ static void DrawTimeline(HDC hdc, RECT client, const char* label, const Slice* s
     HPEN border = CreatePen(PS_SOLID, 1, RGB(0,0,0));
     HGDIOBJ oldPen = SelectObject(hdc, border);
 
-    // outer lane box
-    // outer lane box (scrolls horizontally)
     Rectangle(hdc, left - scrollX, top, left - scrollX + width, top + height);
 
-    int lastX = left;
-    for (int i = 0; i < n; ++i) {
-    int x0 = left + (int)((double)s[i].start / makespan * width) - scrollX;
-    int x1 = left + (int)((double)s[i].end   / makespan * width) - scrollX;
+    int max_end = 0;
+    for (int i=0;i<n;i++) if (s[i].end > max_end) max_end = s[i].end;
+
+    int *order = NULL;
+    if (n > 0) order = (int*)malloc(sizeof(int)*n);
+    for (int i=0;i<n;i++) order[i] = i;
+    for (int a=0;a<n-1;a++) {
+        for (int b=0;b<n-1-a;b++) {
+            if (s[order[b]].start > s[order[b+1]].start) {
+                int t = order[b]; order[b] = order[b+1]; order[b+1] = t;
+            }
+        }
+    }
+
+    int last_end = 0;
+    COLORREF idleColor = RGB(180,180,180);
+    for (int oi = 0; oi < n; ++oi) {
+        int i = order[oi];
+        int x0 = left + (int)((double)s[i].start / makespan * width) - scrollX;
+        int x1 = left + (int)((double)s[i].end   / makespan * width) - scrollX;
         if (x1 < x0) x1 = x0;
 
+        if (s[i].start > last_end) {
+            int idle_x0 = left + (int)((double)last_end / makespan * width) - scrollX;
+            int idle_x1 = left + (int)((double)s[i].start / makespan * width) - scrollX;
+            RECT idle_r = { idle_x0, top, idle_x1, top + height };
+            HBRUSH idle_br = CreateSolidBrush(idleColor);
+            FillRect(hdc, &idle_r, idle_br);
+            DeleteObject(idle_br);
+        }
+
         RECT r = { x0, top, x1, top + height };
-        HBRUSH br = CreateSolidBrush(colorForPid(s[i].pid));
+        HBRUSH br = CreateSolidBrush(s[i].pid == -1 ? idleColor : colorForPid(s[i].pid));
         FillRect(hdc, &r, br);
         DeleteObject(br);
 
-        // slice separator
-    MoveToEx(hdc, x0, top, NULL);
-    LineTo(hdc, x0, top + height);
+        MoveToEx(hdc, x0, top, NULL);
+        LineTo(hdc, x0, top + height);
 
-        // pid label centered in slice if wide enough
-        if (x1 - x0 > 18) {
+        if (x1 - x0 > 18 && s[i].pid != -1) {
             char buf[16]; wsprintfA(buf, "P%d", s[i].pid);
             int tx = x0 + ((x1 - x0) / 2) - 8;
             int ty = top + (height/2 - 8);
             TextOutA(hdc, tx, ty, buf, (int)lstrlenA(buf));
         }
-        lastX = x1;
+        if (s[i].end > last_end) last_end = s[i].end;
     }
-    // right border
+    if (order) free(order);
+    if (max_end < makespan) {
+        int idle_x0 = left + (int)((double)max_end / makespan * width) - scrollX;
+        int idle_x1 = left + (int)((double)makespan / makespan * width) - scrollX;
+        RECT idle_r = { idle_x0, top, idle_x1, top + height };
+        HBRUSH idle_br = CreateSolidBrush(idleColor);
+        FillRect(hdc, &idle_r, idle_br);
+        DeleteObject(idle_br);
+    }
     MoveToEx(hdc, left - scrollX + width, top, NULL);
     LineTo(hdc, left - scrollX + width, top + height);
 
     SelectObject(hdc, oldPen);
     DeleteObject(border);
 
-    // axis with ticks at slice boundaries (start times)
     int axisY = top + height + 18;
     MoveToEx(hdc, left - scrollX, axisY, NULL);
     LineTo(hdc, left - scrollX + width, axisY);
@@ -72,7 +100,6 @@ static void DrawTimeline(HDC hdc, RECT client, const char* label, const Slice* s
         TextOutA(hdc, x - 6, axisY + 8, tb, (int)lstrlenA(tb));
         lastT = t;
     }
-    // final makespan label
     char tb[16]; wsprintfA(tb, "%d", makespan);
     TextOutA(hdc, left - scrollX + width - 10, axisY + 8, tb, (int)lstrlenA(tb));
 }
@@ -178,8 +205,7 @@ void ShowGanttWindow(const char* title,
     g_rr   = rr;   g_n_rr   = n_rr;
     g_makespan = makespan;
 
-    // estimate canvas width proportional to makespan
-    g_canvas_width = 120 + (g_makespan * 4); // 4px per time unit
+    g_canvas_width = 120 + (g_makespan * 4);
 
     WNDCLASS wc1 = {0};
     wc1.lpfnWndProc = GanttFrameProc;
@@ -195,10 +221,9 @@ void ShowGanttWindow(const char* title,
     wc2.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
     RegisterClass(&wc2);
 
-    // Compute needed height based on row layout in DrawTimeline
-    int top0 = 50 + 0 * 120; int lane_h = 60; int axis_extra = 18 + 22; // lane + axis + labels
-    int content_h = (top0 + (2 * 120) + lane_h + axis_extra) + 20; // 3 rows (0..2) + bottom pad
-    if (content_h < 420) content_h = 420; // minimum comfortable height
+    int top0 = 50 + 0 * 120; int lane_h = 60; int axis_extra = 18 + 22;
+    int content_h = (top0 + (2 * 120) + lane_h + axis_extra) + 20;
+    if (content_h < 420) content_h = 420;
 
     HWND hwnd = CreateWindow("GanttFrameWnd", title ? title : "Gantt",
         WS_OVERLAPPEDWINDOW, 120, 120, 1280, content_h,
