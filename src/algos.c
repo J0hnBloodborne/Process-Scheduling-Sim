@@ -1,8 +1,10 @@
 #include "../include/algos.h"
 #include "../include/heap.h"
 #include "../include/pclass.h"
+#include "../include/gantt.h"
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 
 SchedResult fcfs(Process *p, int n) {
     quicksort(p, 0, n - 1);
@@ -195,6 +197,77 @@ SchedResult rr_ctx(Process *p, int n, int q, int *ctx_switches) {
     free(in_queue);
 
     if (ctx_switches) *ctx_switches = switches;
+    SchedResult r = { total_waiting / (double)n, total_turnaround / (double)n };
+    return r;
+}
+SchedResult rr_with_trace(Process *p, int n, int q, struct Slice **out, int *outCount) {
+    int current_time = 0, done = 0;
+    int total_waiting = 0, total_turnaround = 0;
+
+    int capacity = n * n;
+    struct Slice *slices = malloc(sizeof(*slices) * capacity);
+    int sc = 0;
+
+    int *queue = malloc(n * n * sizeof(int));
+    int front = 0, rear = 0;
+    bool *in_queue = calloc(n, sizeof(bool));
+
+    if (rear == 0) {
+        int earliest = INT_MAX;
+        for (int i = 0; i < n; i++) if (p[i].arrival < earliest) earliest = p[i].arrival;
+        current_time = earliest;
+        for (int i = 0; i < n; i++) {
+            if (p[i].arrival == earliest) {
+                queue[rear++] = i;
+                in_queue[i] = true;
+            }
+        }
+    }
+
+    while (front < rear) {
+        int i = queue[front++];
+        if (p[i].remaining > 0 && p[i].arrival <= current_time) {
+            int slice = (p[i].remaining > q) ? q : p[i].remaining;
+            if (p[i].remaining == p[i].burst) {
+                p[i].response = current_time - p[i].arrival;
+            }
+            int start = current_time;
+            p[i].remaining -= slice;
+            current_time += slice;
+
+            if (sc < capacity) {
+                slices[sc].pid = p[i].pid;
+                slices[sc].start = start;
+                slices[sc].end = current_time;
+                sc++;
+            }
+
+            for (int j = 0; j < n; j++) {
+                if (!in_queue[j] && p[j].arrival <= current_time) {
+                    queue[rear++] = j;
+                    in_queue[j] = true;
+                }
+            }
+            if (p[i].remaining == 0) {
+                p[i].completion = current_time;
+                p[i].turnaround = p[i].completion - p[i].arrival;
+                p[i].waiting = p[i].turnaround - p[i].burst;
+                total_waiting += p[i].waiting;
+                total_turnaround += p[i].turnaround;
+                done++;
+            } else {
+                queue[rear++] = i;
+            }
+        } else if (p[i].remaining > 0) {
+            current_time = p[i].arrival;
+            queue[rear++] = i;
+        }
+    }
+    free(queue);
+    free(in_queue);
+
+    *out = slices;
+    *outCount = sc;
     SchedResult r = { total_waiting / (double)n, total_turnaround / (double)n };
     return r;
 }

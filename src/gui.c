@@ -1,5 +1,6 @@
 #include "../include/gui.h"
 #include "../include/generator.h"
+#include "../include/gantt.h"
 
 #define ID_BTN_OPEN 1
 #define ID_BTN_START 2
@@ -170,14 +171,36 @@ void RunScheduling(HWND hwnd) {
     double avg_resp_sjf  = sum_resp_sjf  / (double)loaded;
     double avg_resp_rr   = sum_resp_rr   / (double)loaded;
 
-    char info[128];
-    snprintf(info, sizeof(info), "Total processes: %d  q=%d", loaded, quantumInput);
-    ShowBarGraph("Average Response Time", info, avg_resp_fcfs, avg_resp_sjf, avg_resp_rr);
-    ShowBarGraph("Context Switches", info, (double)switches_fcfs, (double)switches_sjf, (double)rr_switches);
+    ShowAllGraphsWindow(loaded, quantumInput,
+        res_fcfs.avg_waiting, res_sjf.avg_waiting, res_rr.avg_waiting,
+        res_fcfs.avg_turnaround, res_sjf.avg_turnaround, res_rr.avg_turnaround,
+        avg_resp_fcfs, avg_resp_sjf, avg_resp_rr,
+        switches_fcfs, switches_sjf, rr_switches);
 
-    ShowGraphWindow(loaded, quantumInput,
-                res_fcfs.avg_waiting, res_sjf.avg_waiting, res_rr.avg_waiting,
-                res_fcfs.avg_turnaround, res_sjf.avg_turnaround, res_rr.avg_turnaround);
+    // Old per-window charts replaced by ShowAllGraphsWindow
+
+    // Build slices for Gantt (one window with all three)
+    int makespan = maxC_rr; // same for all in this setup
+    Slice *rr_slices = NULL; int rr_count = 0;
+    // Make a fresh copy for rr_with_trace to avoid using mutated proc_rr
+    Process* rr_copy = malloc(loaded * sizeof(Process));
+    for (int i=0;i<loaded;i++) rr_copy[i] = processes[i], rr_copy[i].remaining = rr_copy[i].burst;
+    rr_with_trace(rr_copy, loaded, quantumInput, &rr_slices, &rr_count);
+
+    Slice *fcfs_slices = malloc(sizeof(Slice) * loaded);
+    Slice *sjf_slices  = malloc(sizeof(Slice) * loaded);
+    for (int i=0;i<loaded;i++) {
+        int start_fcfs = proc_fcfs[i].completion - proc_fcfs[i].burst;
+        fcfs_slices[i].pid = proc_fcfs[i].pid;
+        fcfs_slices[i].start = start_fcfs;
+        fcfs_slices[i].end = proc_fcfs[i].completion;
+
+        int start_sjf = proc_sjf[i].completion - proc_sjf[i].burst;
+        sjf_slices[i].pid = proc_sjf[i].pid;
+        sjf_slices[i].start = start_sjf;
+        sjf_slices[i].end = proc_sjf[i].completion;
+    }
+    ShowGanttWindow("Gantt Chart", fcfs_slices, loaded, sjf_slices, loaded, rr_slices, rr_count, makespan);
 
     // printf("\nResults:\n");
     // printf("FCFS: Avg Waiting = %.2f, Avg Turnaround = %.2f\n", res_fcfs.avg_waiting, res_fcfs.avg_turnaround);
