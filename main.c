@@ -1,7 +1,7 @@
-#include "src/pclass.h"
-#include "src/reader.h"
-#include "src/algos.h"
-#include "src/gui.h"
+#include "include/pclass.h"
+#include "include/reader.h"
+#include "include/algos.h"
+#include "include/gui.h"
 
 #include <windows.h>
 #include <stdlib.h>

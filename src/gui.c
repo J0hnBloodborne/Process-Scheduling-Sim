@@ -1,5 +1,5 @@
-#include "gui.h"
-#include "generator.h"
+#include "../include/gui.h"
+#include "../include/generator.h"
 
 #define ID_BTN_OPEN 1
 #define ID_BTN_START 2

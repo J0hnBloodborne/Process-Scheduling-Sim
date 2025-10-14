@@ -1,4 +1,4 @@
-#include "gl_graphs.h"
+#include "../include/gl_graphs.h"
 #include <windows.h>
 #include <stdio.h>
 

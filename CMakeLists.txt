@@ -5,7 +5,8 @@ set(CMAKE_C_STANDARD 99)
 set(CMAKE_BUILD_TYPE Release)
 
 file(GLOB SRC_FILES "src/*.c")
-include_directories(${CMAKE_SOURCE_DIR}/src)
+# Headers moved to include/
+include_directories(${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/src)
 
 # Resource file (if you want it)
 set(RC_FILE src/quantum.rc)
@@ -21,6 +22,18 @@ if(MINGW)
     set_target_properties(ProcessSchedulingSim PROPERTIES
         LINK_FLAGS "-static -static-libgcc -static-libstdc++ -mwindows"
     )
+endif()
+
+# Statically link the MSVC runtime to avoid requiring the VC++ Redistributable
+# Works for CMake < 3.15 by rewriting /MD to /MT
+if(MSVC)
+    foreach(flag_var
+        CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
+        CMAKE_C_FLAGS_RELWITHDEBINFO CMAKE_C_FLAGS_MINSIZEREL)
+        if(DEFINED ${flag_var})
+            string(REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
+        endif()
+    endforeach()
 endif()
 
 # Output exe to release/

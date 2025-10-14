@@ -1,4 +1,4 @@
-#include "sort.h"
+#include "../include/sort.h"
 
 void swapProcess(Process *a, Process *b) {
     Process temp = *a;

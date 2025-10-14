@@ -1,6 +1,6 @@
-#include "algos.h"
-#include "heap.h"
-#include "pclass.h"
+#include "../include/algos.h"
+#include "../include/heap.h"
+#include "../include/pclass.h"
 #include <stdbool.h>
 #include <stdlib.h>
 
