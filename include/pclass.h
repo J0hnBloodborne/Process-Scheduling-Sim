@@ -8,6 +8,7 @@ typedef struct {
     int turnaround;
     int completion;
     int remaining;
+    int response;
 } Process;
 
 typedef struct {

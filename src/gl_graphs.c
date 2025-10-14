@@ -6,11 +6,12 @@ static double bars[3];
 static const char* barlabels[3] = { "FCFS", "SJF", "RR" };
 static COLORREF barcolors[3] = { RGB(255,0,127), RGB(127,255,0), RGB(0,127,255) };
 static char graphtitle[64];
-static char graphinfo[128]; // New: extra info line
+static char graphinfo[128]; 
 
 #define TITLE_PAD 100
 
 LRESULT CALLBACK GraphWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l);
+static int s_window_offset = 0; 
 
 void DrawBarGraph(HWND hwnd, HDC hdc) {
     RECT client;
@@ -81,7 +82,7 @@ LRESULT CALLBACK GraphWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l) {
     return 0;
 }
 
-void ShowGraph(const char* title, const char* info, double v0, double v1, double v2) {
+void ShowBarGraph(const char* title, const char* info, double v0, double v1, double v2) {
     bars[0]=v0; bars[1]=v1; bars[2]=v2;
     snprintf(graphtitle, sizeof(graphtitle), "%s", title);
     snprintf(graphinfo, sizeof(graphinfo), "%s", info);
@@ -93,8 +94,12 @@ void ShowGraph(const char* title, const char* info, double v0, double v1, double
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
     RegisterClass(&wc);
 
+    int x = 100 + (s_window_offset * 30);
+    int y = 100 + (s_window_offset * 30);
+    s_window_offset = (s_window_offset + 1) % 8;
+
     HWND hwnd = CreateWindow(wc.lpszClassName, title,
-        WS_OVERLAPPEDWINDOW^WS_THICKFRAME, CW_USEDEFAULT, CW_USEDEFAULT, 420, 540,
+        WS_OVERLAPPEDWINDOW^WS_THICKFRAME, x, y, 420, 540,
         NULL, NULL, wc.hInstance, NULL);
     ShowWindow(hwnd, SW_SHOWDEFAULT);
     UpdateWindow(hwnd);
@@ -107,10 +112,10 @@ void ShowGraphWindow(
 ) {
     char info[512];
     snprintf(info, sizeof(info), "Total processes: %d", num_processes);
-    ShowGraph("Average Waiting Time", info, fcfs_wait, sjf_wait, rr_wait);
+    ShowBarGraph("Average Waiting Time", info, fcfs_wait, sjf_wait, rr_wait);
 
     snprintf(info, sizeof(info), "Total processes: %d", num_processes);
-    ShowGraph("Average Turnaround Time", info, fcfs_turn, sjf_turn, rr_turn);
+    ShowBarGraph("Average Turnaround Time", info, fcfs_turn, sjf_turn, rr_turn);
 
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0) > 0)

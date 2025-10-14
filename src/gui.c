@@ -139,7 +139,41 @@ void RunScheduling(HWND hwnd) {
 
     SchedResult res_fcfs = fcfs(proc_fcfs, loaded);
     SchedResult res_sjf  = sjf(proc_sjf, loaded);
-    SchedResult res_rr   = rr(proc_rr, loaded, quantumInput);
+    int rr_switches = 0;
+    SchedResult res_rr   = rr_ctx(proc_rr, loaded, quantumInput, &rr_switches);
+
+    int minA_fcfs = proc_fcfs[0].arrival, maxC_fcfs = proc_fcfs[0].completion;
+    int minA_sjf  = proc_sjf[0].arrival,  maxC_sjf  = proc_sjf[0].completion;
+    int minA_rr   = proc_rr[0].arrival,   maxC_rr   = proc_rr[0].completion;
+    double sum_resp_fcfs = 0.0, sum_resp_sjf = 0.0, sum_resp_rr = 0.0;
+    int switches_fcfs = loaded > 0 ? (loaded - 1) : 0;
+    int switches_sjf = loaded > 0 ? (loaded - 1) : 0;
+    for (int i = 0; i < loaded; i++) {
+        if (proc_fcfs[i].arrival < minA_fcfs) minA_fcfs = proc_fcfs[i].arrival;
+        if (proc_fcfs[i].completion > maxC_fcfs) maxC_fcfs = proc_fcfs[i].completion;
+        sum_resp_fcfs += proc_fcfs[i].response;
+
+        if (proc_sjf[i].arrival < minA_sjf) minA_sjf = proc_sjf[i].arrival;
+        if (proc_sjf[i].completion > maxC_sjf) maxC_sjf = proc_sjf[i].completion;
+        sum_resp_sjf += proc_sjf[i].response;
+
+        if (proc_rr[i].arrival < minA_rr) minA_rr = proc_rr[i].arrival;
+        if (proc_rr[i].completion > maxC_rr) maxC_rr = proc_rr[i].completion;
+        sum_resp_rr += proc_rr[i].response;
+    }
+
+    int span_fcfs = maxC_fcfs - minA_fcfs; if (span_fcfs <= 0) span_fcfs = 1;
+    int span_sjf  = maxC_sjf  - minA_sjf;  if (span_sjf  <= 0) span_sjf  = 1;
+    int span_rr   = maxC_rr   - minA_rr;   if (span_rr   <= 0) span_rr   = 1;
+
+    double avg_resp_fcfs = sum_resp_fcfs / (double)loaded;
+    double avg_resp_sjf  = sum_resp_sjf  / (double)loaded;
+    double avg_resp_rr   = sum_resp_rr   / (double)loaded;
+
+    char info[128];
+    snprintf(info, sizeof(info), "Total processes: %d  q=%d", loaded, quantumInput);
+    ShowBarGraph("Average Response Time", info, avg_resp_fcfs, avg_resp_sjf, avg_resp_rr);
+    ShowBarGraph("Context Switches", info, (double)switches_fcfs, (double)switches_sjf, (double)rr_switches);
 
     ShowGraphWindow(loaded, res_fcfs.avg_waiting, res_sjf.avg_waiting, res_rr.avg_waiting,
                 res_fcfs.avg_turnaround, res_sjf.avg_turnaround, res_rr.avg_turnaround);

@@ -51,6 +51,7 @@ int loadCSV(char *filename, Process *p){
         p[i].turnaround = 0;
         p[i].remaining = p[i].burst;
         p[i].completion = 0;
+        p[i].response = 0;
         i++;
     }
     fclose(file);
