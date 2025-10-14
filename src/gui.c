@@ -67,7 +67,6 @@ void OpenInputFileDialog(HWND hwnd) {
     ofn.lpstrTitle = "Select an input CSV file";
     if (GetOpenFileName(&ofn)) {
         strcpy(selectedFile, fileName);
-        MessageBox(hwnd, selectedFile, "Selected File", MB_OK);
         if (hStaticPath) {
             SetWindowText(hStaticPath, selectedFile);
         }
@@ -98,9 +97,7 @@ INT_PTR CALLBACK QuantumDlgProc(HWND dHwnd, UINT msg, WPARAM w, LPARAM l) {
 void AskQuantumDialog(HWND hwnd) {
     quantumInputBuffer[0] = '\0';
     if (DialogBoxParam(NULL, MAKEINTRESOURCE(101), hwnd, QuantumDlgProc, 0) == IDOK) {
-        char buf[32];
-        sprintf(buf, "Quantum: %d", quantumInput);
-        MessageBox(hwnd, buf, "Quantum Set", MB_OK);
+        // Quantum set; no confirmation popup
     }
 }
 

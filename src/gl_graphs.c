@@ -131,25 +131,32 @@ static Chart g_charts[4];
 static int g_chart_count = 0;
 static char g_info_line[128];
 
-static void DrawOneChart(HDC hdc, RECT client, int top, const Chart* c) {
-    int width = client.right - client.left;
-    int margin = 40;
-    int barw = 80;
-    int gap = 30;
-    int title_h = 26;
-    int bars_top = top + title_h + 10;
-    int bars_base = bars_top + 140;
+static void DrawOneChart(HDC hdc, RECT client, int left, int top, const Chart* c) {
+    int margin = 10;
+    int barw = 70;
+    int gap = 24;
+    int title_h = 22;
+    int bars_top = top + title_h + 14; // a little more space under the title
+    // Compute cell bounds based on 2x2 layout from AllChartsProc
+    int content_top = 76;
+    int content_bottom = client.bottom - 20;
+    int half_h = (content_bottom - content_top) / 2;
+    int cell_top = (top < content_top + half_h) ? content_top : (content_top + half_h);
+    int cell_bottom = (top < content_top + half_h) ? (content_top + half_h) : content_bottom;
+    int desired_bar_area = 180; // target bars area height
+    int bars_base = bars_top + desired_bar_area;
+    if (bars_base > cell_bottom - 26) bars_base = cell_bottom - 26; // leave room for labels
 
     SetBkMode(hdc, TRANSPARENT);
     HFONT hTitle = CreateFontA(20,0,0,0,FW_BOLD,0,0,0,0,0,0,0,0,"Arial");
     SelectObject(hdc, hTitle);
-    TextOutA(hdc, margin, top, c->title, (int)lstrlenA(c->title));
+    TextOutA(hdc, left + margin, top, c->title, (int)lstrlenA(c->title));
     DeleteObject(hTitle);
 
     double maxv = c->v0; if (c->v1>maxv) maxv=c->v1; if (c->v2>maxv) maxv=c->v2; if (maxv<=0) maxv=1;
     HFONT hBar = CreateFontA(16,0,0,0,FW_BOLD,0,0,0,0,0,0,0,0,"Arial");
     SelectObject(hdc, hBar);
-    int bx = margin;
+    int bx = left + margin;
     int bar_max_h = bars_base - bars_top;
     double vals[3] = {c->v0, c->v1, c->v2};
     for (int i=0;i<3;i++) {
@@ -159,8 +166,8 @@ static void DrawOneChart(HDC hdc, RECT client, int top, const Chart* c) {
         RECT r = { bx, bar_top, bx+barw, bars_base };
         FillRect(hdc, &r, brush);
         DeleteObject(brush);
-        char valbuf[32]; wsprintfA(valbuf, "%.2f", vals[i]);
-        TextOutA(hdc, bx+(barw/2)-20, bar_top-18, valbuf, (int)lstrlenA(valbuf));
+        char valbuf[32]; sprintf_s(valbuf, sizeof(valbuf), "%.2f", vals[i]);
+        TextOutA(hdc, bx+(barw/2)-20, bar_top-22, valbuf, (int)lstrlenA(valbuf));
         TextOutA(hdc, bx+(barw/2)-20, bars_base+6, barlabels[i], (int)lstrlenA(barlabels[i]));
         bx += barw + gap;
     }
@@ -183,11 +190,40 @@ static LRESULT CALLBACK AllChartsProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l) {
             TextOutA(hdc, 20, 42, g_info_line, (int)lstrlenA(g_info_line));
             DeleteObject(hInfo);
 
-            int top = 64;
-            for (int i=0;i<g_chart_count;i++) {
-                DrawOneChart(hdc, rc, top, &g_charts[i]);
-                top += 200;
-            }
+            // 2x2 grid layout with divider lines
+            int content_left = 20;
+            int content_right = rc.right - 20;
+            int content_top = 76;
+            int content_bottom = rc.bottom - 20;
+            int mid_x = (content_left + content_right) / 2;
+            int mid_y = content_top + (content_bottom - content_top) / 2;
+
+            // Draw divider lines (vertical and horizontal)
+            HPEN hPen = CreatePen(PS_DOT, 1, RGB(180,180,180));
+            HGDIOBJ oldPen = SelectObject(hdc, hPen);
+            MoveToEx(hdc, mid_x, content_top, NULL);
+            LineTo(hdc, mid_x, content_bottom);
+            MoveToEx(hdc, content_left, mid_y, NULL);
+            LineTo(hdc, content_right, mid_y);
+            SelectObject(hdc, oldPen);
+            DeleteObject(hPen);
+
+            // Chart positions (TL, TR, BL, BR)
+            int cell_pad_x = 12;
+            int cell_pad_y = 10;
+            int tl_left = content_left + cell_pad_x;
+            int tl_top  = content_top + cell_pad_y;
+            int tr_left = mid_x + cell_pad_x;
+            int tr_top  = content_top + cell_pad_y;
+            int bl_left = content_left + cell_pad_x;
+            int bl_top  = mid_y + cell_pad_y;
+            int br_left = mid_x + cell_pad_x;
+            int br_top  = mid_y + cell_pad_y;
+
+            if (g_chart_count > 0) DrawOneChart(hdc, rc, tl_left, tl_top, &g_charts[0]);
+            if (g_chart_count > 1) DrawOneChart(hdc, rc, tr_left, tr_top, &g_charts[1]);
+            if (g_chart_count > 2) DrawOneChart(hdc, rc, bl_left, bl_top, &g_charts[2]);
+            if (g_chart_count > 3) DrawOneChart(hdc, rc, br_left, br_top, &g_charts[3]);
             EndPaint(hwnd, &ps);
         } return 0;
     }
@@ -219,7 +255,7 @@ void ShowAllGraphsWindow(
     int y = 80 + (s_window_offset * 30);
     s_window_offset = (s_window_offset + 1) % 8;
     HWND hwnd = CreateWindow(wc.lpszClassName, "All Metrics",
-        WS_OVERLAPPEDWINDOW^WS_THICKFRAME, x, y, 640, 900,
+        WS_OVERLAPPEDWINDOW^WS_THICKFRAME, x, y, 1100, 560,
         NULL, NULL, wc.hInstance, NULL);
     ShowWindow(hwnd, SW_SHOWDEFAULT);
     UpdateWindow(hwnd);
