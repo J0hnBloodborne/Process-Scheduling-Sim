@@ -107,14 +107,15 @@ void ShowBarGraph(const char* title, const char* info, double v0, double v1, dou
 
 void ShowGraphWindow(
     int num_processes,
+    int quantum,
     double fcfs_wait, double sjf_wait, double rr_wait,
     double fcfs_turn, double sjf_turn, double rr_turn
 ) {
     char info[512];
-    snprintf(info, sizeof(info), "Total processes: %d", num_processes);
+    snprintf(info, sizeof(info), "Total processes: %d  q=%d", num_processes, quantum);
     ShowBarGraph("Average Waiting Time", info, fcfs_wait, sjf_wait, rr_wait);
 
-    snprintf(info, sizeof(info), "Total processes: %d", num_processes);
+    snprintf(info, sizeof(info), "Total processes: %d  q=%d", num_processes, quantum);
     ShowBarGraph("Average Turnaround Time", info, fcfs_turn, sjf_turn, rr_turn);
 
     MSG msg;

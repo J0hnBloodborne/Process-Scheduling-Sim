@@ -175,7 +175,8 @@ void RunScheduling(HWND hwnd) {
     ShowBarGraph("Average Response Time", info, avg_resp_fcfs, avg_resp_sjf, avg_resp_rr);
     ShowBarGraph("Context Switches", info, (double)switches_fcfs, (double)switches_sjf, (double)rr_switches);
 
-    ShowGraphWindow(loaded, res_fcfs.avg_waiting, res_sjf.avg_waiting, res_rr.avg_waiting,
+    ShowGraphWindow(loaded, quantumInput,
+                res_fcfs.avg_waiting, res_sjf.avg_waiting, res_rr.avg_waiting,
                 res_fcfs.avg_turnaround, res_sjf.avg_turnaround, res_rr.avg_turnaround);
 
     // printf("\nResults:\n");
