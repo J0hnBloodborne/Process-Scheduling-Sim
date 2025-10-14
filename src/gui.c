@@ -1,15 +1,23 @@
 #include "gui.h"
+#include "generator.h"
 
 #define ID_BTN_OPEN 1
 #define ID_BTN_START 2
 #define ID_BTN_EXIT 3
 #define ID_STATIC_PATH 1002
+#define ID_BTN_GEN 4
 
 static char selectedFile[MAX_PATH] = {0};
 static int quantumInput = 0;
 static HWND hStaticPath = NULL;
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+
+// Forward declarations for local helpers
+static void DoGenerateCSV(HWND hwnd);
+static int AskProcessCountDialog(HWND hwnd);
+static int SaveCSVDialog(HWND hwnd, char* outPath, DWORD outSize);
+INT_PTR CALLBACK ProcessCountDlgProc(HWND dHwnd, UINT msg, WPARAM w, LPARAM l);
 
 const char* GetSelectedFile() { return selectedFile; }
 int GetQuantumInput() { return quantumInput; }
@@ -22,17 +30,19 @@ void ShowMainWindow(HINSTANCE hInstance) {
     RegisterClass(&wc);
 
     HWND hwnd = CreateWindowEx(0, wc.lpszClassName, "Process Scheduling Simulator",
-        WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME, CW_USEDEFAULT, CW_USEDEFAULT, 400, 200,
+        WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME, CW_USEDEFAULT, CW_USEDEFAULT, 520, 240,
         NULL, NULL, hInstance, NULL);
     CreateWindow("BUTTON", "Open input file", WS_VISIBLE | WS_CHILD,
         20, 30, 120, 30, hwnd, (HMENU)ID_BTN_OPEN, hInstance, NULL);
     CreateWindow("BUTTON", "Start Test", WS_VISIBLE | WS_CHILD,
         150, 30, 120, 30, hwnd, (HMENU)ID_BTN_START, hInstance, NULL);
+    CreateWindow("BUTTON", "Generate CSV", WS_VISIBLE | WS_CHILD,
+        280, 30, 120, 30, hwnd, (HMENU)ID_BTN_GEN, hInstance, NULL);
     CreateWindow("BUTTON", "Exit", WS_VISIBLE | WS_CHILD,
-        280, 30, 80, 30, hwnd, (HMENU)ID_BTN_EXIT, hInstance, NULL);
+        410, 30, 80, 30, hwnd, (HMENU)ID_BTN_EXIT, hInstance, NULL);
 
     hStaticPath = CreateWindow("STATIC", "No file selected.", WS_VISIBLE | WS_CHILD | SS_LEFT,
-        20, 70, 340, 20, hwnd, (HMENU)ID_STATIC_PATH, hInstance, NULL);
+        20, 70, 480, 20, hwnd, (HMENU)ID_STATIC_PATH, hInstance, NULL);
 
     ShowWindow(hwnd, SW_SHOWDEFAULT);
     UpdateWindow(hwnd);
@@ -64,6 +74,8 @@ void OpenInputFileDialog(HWND hwnd) {
 }
 
 static char quantumInputBuffer[16] = {0};
+static char processCountBuffer[16] = {0};
+static int processCountInput = 0;
 
 INT_PTR CALLBACK QuantumDlgProc(HWND dHwnd, UINT msg, WPARAM w, LPARAM l) {
     switch (msg) {
@@ -156,6 +168,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                     AskQuantumDialog(hwnd);
                     RunScheduling(hwnd);
                     break;
+                case ID_BTN_GEN:
+                    DoGenerateCSV(hwnd);
+                    break;
                 case ID_BTN_EXIT:
                     PostQuitMessage(0);
                     break;
@@ -168,4 +183,73 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }
     return 0;
+}
+
+INT_PTR CALLBACK ProcessCountDlgProc(HWND dHwnd, UINT msg, WPARAM w, LPARAM l) {
+    switch (msg) {
+        case WM_COMMAND:
+            if (LOWORD(w) == IDOK) {
+                GetDlgItemText(dHwnd, 1001, processCountBuffer, 15);
+                processCountInput = atoi(processCountBuffer);
+                EndDialog(dHwnd, IDOK);
+                return 1;
+            } else if (LOWORD(w) == IDCANCEL || LOWORD(w) == 2) {
+                EndDialog(dHwnd, 0);
+                return 1;
+            }
+            break;
+        case WM_CLOSE:
+            EndDialog(dHwnd, 0);
+            return 1;
+    }
+    return 0;
+}
+
+static int AskProcessCountDialog(HWND hwnd) {
+    processCountBuffer[0] = '\0';
+    processCountInput = 0;
+    if (DialogBoxParam(NULL, MAKEINTRESOURCE(102), hwnd, ProcessCountDlgProc, 0) == IDOK) {
+        if (processCountInput <= 0) {
+            MessageBox(hwnd, "Enter a positive number of processes.", "Input Error", MB_ICONERROR);
+            return 0;
+        }
+        return processCountInput;
+    }
+    return 0;
+}
+
+static int SaveCSVDialog(HWND hwnd, char* outPath, DWORD outSize) {
+    OPENFILENAME ofn = {0};
+    char fileName[MAX_PATH] = {0};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = hwnd;
+    ofn.lpstrFile = fileName;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.lpstrFilter = "CSV Files\0*.csv\0All Files\0*.*\0";
+    ofn.lpstrDefExt = "csv";
+    ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
+    ofn.lpstrTitle = "Save generated CSV as...";
+    if (GetSaveFileName(&ofn)) {
+        strncpy(outPath, fileName, outSize - 1);
+        outPath[outSize - 1] = '\0';
+        return 1;
+    }
+    return 0;
+}
+
+static void DoGenerateCSV(HWND hwnd) {
+    int nprocs = AskProcessCountDialog(hwnd);
+    if (nprocs <= 0) return;
+
+    char savePath[MAX_PATH] = {0};
+    if (!SaveCSVDialog(hwnd, savePath, sizeof(savePath))) return;
+
+    int rc = generate_random_csv(savePath, nprocs, 0, 40, 2, 20);
+    if (rc == 0) {
+        MessageBox(hwnd, "CSV generated successfully.", "Success", MB_OK);
+        strcpy(selectedFile, savePath);
+        if (hStaticPath) SetWindowText(hStaticPath, selectedFile);
+    } else {
+        MessageBox(hwnd, "Failed to generate CSV.", "Error", MB_ICONERROR);
+    }
 }

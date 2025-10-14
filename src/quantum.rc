@@ -6,3 +6,13 @@ BEGIN
     EDITTEXT 1001, 55, 13, 50, 14
     PUSHBUTTON "OK", 1, 35, 30, 50, 14
 END
+
+102 DIALOG 0, 0, 140, 60
+CAPTION "Generate CSV"
+FONT 8, "MS Sans Serif"
+BEGIN
+    LTEXT "Processes:", -1, 10, 15, 50, 10
+    EDITTEXT 1001, 65, 13, 60, 14
+    PUSHBUTTON "OK", 1, 20, 35, 45, 14
+    PUSHBUTTON "Cancel", 2, 75, 35, 45, 14
+END

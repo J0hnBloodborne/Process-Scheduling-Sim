@@ -20,20 +20,33 @@ char* fileExplorerDiag() {
 
 int countLines(char *filename) {
     FILE *file = fopen(filename, "r");
-    int l = 0;
-    while (!feof(file)) if (fgetc(file) == '\n') l++;
+    int l = 0, c, last_was_nl = 0;
+    while ((c = fgetc(file)) != EOF) {
+        if (c == '\n') { l++; last_was_nl = 1; }
+        else last_was_nl = 0;
+    }
     fclose(file);
-    return l;
+    return l + (!last_was_nl ? 1 : 0);
 }
 
 int loadCSV(char *filename, Process *p){
     FILE *file = fopen(filename, "r");
-    char line[32];
+    if (!file) return 0;
+    char line[64];
     int i = 0;
     while (fgets(line, sizeof(line), file)) {
-        p[i].pid = atoi(strtok(line, ","));
-        p[i].burst = atoi(strtok(NULL, ","));
-        p[i].arrival = atoi(strtok(NULL, ","));
+        char *tok = strtok(line, ",");
+        if (!tok) break;
+        p[i].pid = atoi(tok);
+
+        tok = strtok(NULL, ",");
+        if (!tok) break;
+        p[i].arrival = atoi(tok);
+
+        tok = strtok(NULL, ",\r\n");
+        if (!tok) break;
+        p[i].burst = atoi(tok);
+
         p[i].waiting = 0;
         p[i].turnaround = 0;
         p[i].remaining = p[i].burst;
